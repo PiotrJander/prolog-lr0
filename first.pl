@@ -57,8 +57,6 @@ przodkowie(Y) :- przodek(X, Y), format('~w ~s grandparent~n', [X, "is the"]), nl
 nat(0).
 nat(s(X)) :- nat(X).
 
-% TODO what is the cut !
-
 plus(0, X, X).
 plus(s(X), Y, Z) :- plus(X, s(Y), Z).
 
@@ -381,8 +379,6 @@ drzewko(Drzewko) :-
     insertBST(T3, 2, T4),
     insertBST(T4, 4, Drzewko).
 
-% delete from tree  1,2,3 4 5,6,7 delete 4 we want 
-
 % 3 wersje tej procedury: jeśli element już jest w drzewie, to sukces (ponowne wstawienie elementu lub nie) lub porażka
 
 % b') (ew. jeśli czas pozwoli albo zadanie do domu) deleteBST/3
@@ -397,8 +393,6 @@ deleteBST(node(Left, Value, Right), Elem, Tree) :-
     Tree = node(Left, Value, NewRight)
     ;
     Elem = Value,
-    % delete_root(node(Left, Value, Right), Elem, Tree)
-    % TODO nesting like this?
     (
         (Left, Right) = (nil, nil), !,
         Tree = nil
@@ -414,16 +408,41 @@ deleteBST(node(Left, Value, Right), Elem, Tree) :-
         Tree = node(Left, Min, NewRight)
     ).
 
-% delete_root(node(Left, Value, Right), Elem, Tree)
-
 minimumBST(node(Left, _, _), Min) :- minimumBST(Left, Min).
 minimumBST(node(nil, Value, _), Value). 
 
 % c) (ew. wypiszBST(D) = wypisanie na ekranie, porządek infiksowy)
 
+wypiszBST(nil).
+wypiszBST(node(Left, Value, Right)) :-
+    wypiszBST(Left),
+    write(Value),
+    nl,
+    wypiszBST(Right).
+
 % d) wypiszBST(D, L) wtw, gdy L=lista wszystkich wierzchołków D (porządek infiksowy)
 
+listBST(nil, []).
+listBST(node(Left, Value, Right), Result) :-
+    listBST(Left, LeftList),
+    listBST(Right, RightList),
+    append(LeftList, [Value|RightList], Result).
+
 % e) stworzBST(L, D) wtw, gdy D jest drzewem BST zawierającym wszystkie elementy listy L (akumulator, ew. bez)
+
+% TODO ogolnie, jaki sens akumulatora? ogonowa rekurencja? wyw rek na koncu?
+
+% stworzBST([], nil).
+% stworzBST([E|L], D) :-
+%     stworzBST(L, D2),
+%     insertBST(D2, E, D).
+
+stworzBST(L, D) :- stworzBST(L, nil, D).
+
+stworzBST([], D, D).
+stworzBST([E|L], A, D) :-
+    stworzBST(L, D2),
+    insertBST(D2, E, D).
 
 % f) liscie(D, L) wtw, gdy L = lista wszystkich liści, od lewej do prawej
 
