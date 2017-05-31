@@ -3,13 +3,60 @@
 % TODO
 % TODO we'd like debug messages when things dont go as expected
 % TODO is the determinism with green cuts everywhere okay?
-
-%%%%%%%%%%%%%%%%%%%
-% example automaton
+% TODO need to detect non-LR(0) grammar
+% TODO (aut, yes) albo (null, opis)
 
 % shift(State, Terminal, NewState).
 % reduce(State, Number, Nonterminal).
 % goto(State, Nonterminal, NewState).
+
+%%%%%%%%%%%%%%%
+% createLR
+
+createLR(Grammar, Automaton, Result).
+
+% transform the grammar to convenient form
+% augment with Z
+% start with Z -> start production
+% make state-closure
+% states are arbitarily numbered
+% for each production in the closure, when . Sym, add a transition on symbol
+
+% we can be filling the table on the go
+% complete the closure for the state
+% for each symbol after dot
+% if sym is terminal
+    % see if state already exists
+    % if not create one with closure
+        % if dot at the end, then add a reduce
+    % IMPORTANT: state is ident by the first dotted item
+    % add a shift
+% if sym is nt, then add a goto
+
+% state has its number and list of dotted items, where first one is unique to the state
+% first dotted item in state has the somewhere
+% all other dotted items have the dot in the middle
+
+% actually, maybe no need to store the closure anywhere
+% just store states with the first ident production
+% for all other productions, just add transitions
+% the state machine is a graph: BFS or DFS?
+% in either case, need to mark nodes white/grey/black
+% could make states dynamic, or in a dictionary or list
+% if dict, then check sicstus, maybe impl own dict
+
+% dotted items: like productions prod, but with dot added
+% actually distrubute rhs to prod2(NT, RHS); this can be a dotted item
+
+% start: take start production, put a dot, make closure
+
+% when making the automaton
+% retract all relation desc automaton
+% dynamically add such relations
+% export those relations to a list
+
+%%%%%%%%%%%%%%%%%%%
+% example automaton
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
 
