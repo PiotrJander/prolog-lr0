@@ -32,29 +32,12 @@ example_automaton([
     goto_in(3, a, 6)
 ]).
 
-shift_in(0, a, 3).
-shift_in(0, b, 4).
-shift_in(1, eof, accept).
-shift_in(2, a, 3).
-shift_in(2, b, 4).
-shift_in(3, a, 3).
-shift_in(3, b, 4).
-
 shift(state(From), t(Through), state(To)) :- shift_in(From, Through, To).
-
-reduce_in(4, 1, a).
-reduce_in(5, 2, s).
-reduce_in(6, 2, a).
 
 reduce(state(S), SuccNumber, nt(Nonterminal)) :-
     reduce_in(S, Number, Nonterminal),
     % Number > 0, !,  % TODO trying to avoid inf loop
     succs(Number, SuccNumber).
-
-goto_in(0, a, 2).
-goto_in(0, s, 1).
-goto_in(2, a, 5).
-goto_in(3, a, 6).
 
 goto(state(From), nt(Through), state(To)) :- goto_in(From, Through, To).
 
@@ -75,8 +58,6 @@ accept(Automaton, Word) :-
     assertall(Automaton),
     automaton(Word, [state(0)]),
     retract_automaton.
-
-accept_example(Word) :- automaton(Word, [state(0)]).
 
 automaton([], [state(accept)|_]) :- !.
 automaton([Symbol|Word], [State|Stack]) :-  % we'd like the invariant that State is top of the Stack
@@ -102,22 +83,28 @@ stack_reduce([_,_|Stack], succ(Number), Nonterminal, NewStack) :-
 %%%%%%%
 % tests
 
-test_example :-
-    accept_example([b,b, eof]),
-    accept_example([a,b,b, eof]),
-    accept_example([b,a,b, eof]),
-    accept_example([a,b,a,b, eof]),
-    accept_example([a,b,a,a,b, eof]),
-    accept_example([a,a,b,a,a,b, eof]),
+test_automaton :-
+    example_automaton(A),
+    accept(A, [b,b,eof]).
 
-    \+ accept_example([eof]),
-    \+ accept_example([a,a, eof]),
-    \+ accept_example([b, eof]),  % TODO loops inf on reduce(state(4), succ(_9099428), nt(a))
-    \+ accept_example([a,b, eof]),
-    \+ accept_example([b,b,a, eof]),
-    \+ accept_example([b,a,b,a, eof]),
-    \+ accept_example([b,b,b, eof]),
-    \+ accept_example([a,b,a,b,a,b, eof]).
+test_example :-
+    example_automaton(A),
+
+    accept(A, [b,b, eof]),
+    accept(A, [a,b,b, eof]),
+    accept(A, [b,a,b, eof]),
+    accept(A, [a,b,a,b, eof]),
+    accept(A, [a,b,a,a,b, eof]),
+    accept(A, [a,a,b,a,a,b, eof]),
+
+    \+ accept(A, [eof]),
+    \+ accept(A, [a,a, eof]),
+    \+ accept(A, [b, eof]),
+    \+ accept(A, [a,b, eof]),
+    \+ accept(A, [b,b,a, eof]),
+    \+ accept(A, [b,a,b,a, eof]),
+    \+ accept(A, [b,b,b, eof]),
+    \+ accept(A, [a,b,a,b,a,b, eof]).
 
 %%%%%%%%%
 % helpers
@@ -133,12 +120,3 @@ succs(0, 0).
 succs(N, succ(S)) :-
     M is N - 1,
     succs(M, S).
-
-%%%%%%%%%%%%%%%%%%%%%%
-% grammar with difference lists
-% loops infinitely when trying to generate sentences.
-
-s --> a, a.
-
-a --> [a], a.
-a --> [b].
