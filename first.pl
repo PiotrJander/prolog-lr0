@@ -93,14 +93,16 @@ element(E, [_|L]) :- element(E, L).
 %        podać (wiele) zastosowań procedury scal/3
 
 scal([], W, W).
-scal([E|L], R, W) :- scal(L, R, M), W = [E|M].
+scal([E|L], R, [E|M]) :- scal(L, R, M).
+% scal([E|L], R, W) :- scal(L, R, M), W = [E|M].
 
 %     e') intersect(Z1,Z2) wtw, gdy zbiory (listy) Z1 i Z2 mają niepuste przecięcie
 
-intersect([E], Y) :- element(E, Y).
+intersect([], _) :- false.
+intersect(_, []) :- false.
 intersect([E|X], Y) :-
-    element(E, Y);
-    % OR
+    element(E, Y)
+    ;
     intersect(X, Y).
 
 %     f) podziel(Lista, NieParz, Parz) == podział danej listy na dwie
@@ -143,11 +145,46 @@ wypisz([E|X]) :- format('~w, ', [E]), wypisz(X).
 %          insertionSort(Lista, Posortowana),
 %          insert(Lista, Elem, NowaLista)
 
-insert([], Elem, [Elem]). 
-insert([E|Lista], Elem, NowaLista) :- ( Elem < E -> NowaLista = [Elem,E|Lista] ; insert(Lista, Elem, R), NowaLista = [E|R] ).
+% insert([], Elem, [Elem]). 
+% insert([E|Lista], Elem, NowaLista) :- 
+%     Elem < E,
+%     NowaLista = [Elem,E|Lista]
+%     ;
+%     Elem >= E,
+%     insert(Lista, Elem, R), 
+%     NowaLista = [E|R].
+
+insert([], Elem, [Elem]).
+insert([E|List], Elem, [Elem, E | List]) :- 
+    Elem =< E, !.
+insert([E|List], Elem, [E|Result]) :-
+    Elem > E,
+    insert(List, Elem, Result).
+
+% ( 
+%     Elem < E -> 
+%     NowaLista = [Elem,E|Lista]
+%     ; 
+%     insert(Lista, Elem, R), 
+%     NowaLista = [E|R]
+% ).
+
+% TODO czy wersja z akumulatorem jest lepsza?
 
 insertionSort([], []).
 insertionSort([E|Lista], Posortowana) :- insertionSort(Lista, L), insert(L, E, Posortowana).
+
+insertionSortAcc(List, Sorted) :- insertionSortAcc(List, [], Sorted).
+
+insertionSortAcc([], Sorted, Sorted).
+insertionSortAcc([E|List], Acc, Sorted) :-
+    insert(Acc, E, AccNew),
+    insertionSortAcc(List, AccNew, Sorted).
+
+l([100,99,98,97,96,95,94,93,92,91,90,89,88,87,86,85,84,83,82,81,80,79,78,77,76,75,74,73,72,
+71,70,69,68,67,66,65,64,63,62,61,60,59,58,57,56,55,54,53,52,51,50,49,48,47,46,45,44,43,42,
+41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,
+11,10,9,8,7,6,5,4,3,2,1]).
 
 % insert from the end
 % sort 
@@ -188,21 +225,25 @@ suma([E|L], A, S) :- B is A + E, suma(L, B, S).
 
 % make list
 
-range(X, X, []).
-range(X, Y, L) :-
-    Z is X + 1,
-    range(Z, Y, K),
-    L = [X|K].
+% range(X, X, []).
+% range(X, Y, L) :-
+%     Z is X + 1,
+%     range(Z, Y, K),
+%     L = [X|K].
 
-% does this even make sense?
-series(X, [X|L]) :-
-    Y is X + 1,
-    series(Y, L).
+% % TODO does this even make sense?
+% series(X, [X|L]) :-
+%     Y is X + 1,
+%     series(Y, L).
 
-take(0, [], _).
-take(N, [E|S], [E|L]) :-
-    M is N - 1,
-    take(M, S, L).
+% take(0, [], _).
+% take(N, [E|S], [E|L]) :-
+%     M is N - 1,
+%     take(M, S, L).
+
+% TODO should we cut for all pattern matching?
+zrobliste(0,[]):- !.
+zrobliste(A,[A|L]) :- B is A-1, zrobliste(B,L).
 
 % b) dlugosc(L, K) wtw, gdy K = liczba elementów listy L (length/2)
 
@@ -217,9 +258,14 @@ dlugosc([_|L], A, K) :-
 
 min([E|L], M) :- min(L, E, M).
 
+% TODO for 100000000 length list -> stack overflow
 min([], M, M).
 min([E|L], N, M) :-
-    (E < N) -> min(L, E, M) ; min(L, N, M).
+    E < N, !,
+    min(L, E, M)
+    ;
+    E >= N,
+    min(L, N, M).
 
 % d) odwroc(L, R) wtw, gdy R jest odwróconą listą L (np. odwroc([1,2,3,4], [4,3,2,1]) - sukces)
 
@@ -230,7 +276,13 @@ odwroc([E|L], H, R) :- odwroc(L, [E|H], R).
 
 % e) palindrom(Slowo) wtw, gdy (lista) Slowo jest palindromem (np. palindrom([k,a,j,a,k]), palindrom([1,b,2,b,1]) - sukcesy)
 
-palindrom(L) :- odwroc(L, R), L = R.
+palindrom(L) :- odwroc(L, L).
+
+pal(L) :-  pal(L, []).
+
+pal(L, L).                  % parzysta dlugosc
+pal([_|L], L).              % nieparzysta, np. kajak, czyli [k,a,j,a,k]
+pal([E|L], A) :-  pal(L, [E|A]).
 
 % f) slowo(Slowo) == Slowo= anbnanbn (Uwaga: bez arytmetyki!) dwa warianty: (*) n > 0 (**) n >= 0 (np. slowo([a,a,b,b]) - sukces)
 
@@ -357,14 +409,13 @@ mammal(X) :-
 % a) drzewo(D) wtw, gdy D jest drzewem binarnym
 
 drzewo(nil).
-drzewo(node(left, value, right)) :- drzewo(left), drzewo(right).
+drzewo(node(left, _, right)) :- drzewo(left), drzewo(right).
 
 % b) insertBST(DrzewoBST, Elem, NoweDrzewoBST)
 
 insertBST(nil, Elem, node(nil, Elem, nil)).
 insertBST(node(Left, Value, Right), Elem, NoweDrzewoBST) :-
-    Elem =< Value,
-    !,
+    Elem =< Value, !,
     insertBST(Left, Elem, NewLeft),
     NoweDrzewoBST = node(NewLeft, Value, Right)
     ;
@@ -441,11 +492,120 @@ stworzBST(L, D) :- stworzBST(L, nil, D).
 
 stworzBST([], D, D).
 stworzBST([E|L], A, D) :-
-    stworzBST(L, D2),
-    insertBST(D2, E, D).
+    insertBST(A, E, ANew),
+    stworzBST(L, ANew, D).
 
 % f) liscie(D, L) wtw, gdy L = lista wszystkich liści, od lewej do prawej
 
+liscie(nil, []).
+liscie(node(Left, Value, Right), L) :-
+    (Left, Right) = (nil, nil), !,
+    L = [Value]
+    ;
+    % (Left, Right) /= (nil, nil), % TODO should we duplicate condition here?
+    liscie(Left, LeftLeaves),
+    liscie(Right, RightLeaves),
+    append(LeftLeaves, RightLeaves, L).
+
 % g) sortBST(L, S) wtw, gdy S = lista posortowana, przy użyciu drzew BST
 
+sortBST(L, S) :-
+    stworzBST(L, D),
+    listBST(D, S).
+
 % h) wszerz(D, L) wtw, gdy L = lista wszystkich wierzchołków wszerz
+
+% TODO difference lists
+% to potrzeba list roznicowych
+% kolejka.
+
+wszerz(Tree, List) :- wszerz([Tree], [], List).
+
+% TODO how come we can have pattern matching on both sides?
+% TODO why we get the reverse?
+
+wszerz([], Acc, Acc).
+wszerz([nil|Queue], Acc, List) :- wszerz(Queue, Acc, List).
+wszerz([node(Left, Value, Right)|Queue], Acc, List) :-
+    append(Queue, [Left, Right], NewQueue),
+    wszerz(NewQueue, [Value|Acc], List).
+
+% wszerz(D, LW) :-  wszerz_pom([D], LW).
+
+% wszerz_pom([], []).
+% wszerz_pom([ nil | KD ], LW) :-
+%            wszerz_pom( KD, LW ).
+% wszerz_pom([ tree( L, W, P ) | KD ], [ W | LW ]) :-
+%            append(KD, [ L, P ], NKD),
+%            wszerz_pom(NKD, LW).
+
+% Grafy
+% (skierowane, nieskierowane, cykliczne, acykliczne, etykietowane itd.) (reprezentacja termowa oraz reprezentacja klauzulowa)
+
+% Reprezentacja grafów: zbiory krawędzi, czyli
+
+% listy termów postaci np. kr(A, B)
+% klauzule unarne typu: edge(A, B).
+% Grafy DAG (skierowane, acykliczne)
+% Zdefiniować predykaty:
+
+% a) connect(A,B), connect(Graf,A,B) wtw, gdy istnieje ścieżka z A do B.
+% Uwaga: ścieżka = niepusty (!) ciąg krawędzi
+
+connect(A, B) :- kr(A, B).
+connect(A, B) :- kr(A, C), connect(C, B).
+
+krs(a, b).
+krs(b, c).
+krs(c, d).
+krs(d, e).
+
+kr(a, b).
+kr(b, c).
+kr(c, a).
+kr(c, d).
+kr(d, e).
+
+% TODO how to avoid infinite recursion here?
+% kr(A, B) :- kr(B, A).
+
+graph([krs(a, b), krs(b, c), krs(c,d), krs(d, e)]).
+
+connect(Graph, A, B) :- member(krs(A, B), Graph).
+connect(Graph, A, B) :- 
+    member(krs(A, C), Graph),
+    connect(Graph, C, B).
+
+% b) path(A,B,P) wtw, gdy P = opis ścieżki z A do B, tzn. P = [A, ..., B]
+
+path(A, B, [krs(A, B)]) :- krs(A, B).
+path(A, B, [krs(A, C)|P]) :-
+    krs(A, C),
+    path(C, B, P).
+
+% Grafy (nie)skierowane, (a)cykliczne
+% c) pathC(A,B,P) w dowolnym grafie skierowanym (cyklicznym)
+
+pathC(A, B, P) :- pathC(A, B, [], P).
+
+pathC(A, B, _Visited, [A, B]) :- kr(A, B).
+pathC(A, B, Visited, [A|P]) :-
+    kr(A, C),
+    \+ member(C, Visited),
+    pathC(C, B, P).
+
+% d) euler/? - czy dany graf jest grafem Eulera, czyli znalezienie (sprawdzenie) ścieżki Eulera (wprost z definicji):
+% ścieżka, która przechodzi przez każdą krawędź grafu dokładnie raz
+
+% Struktury otwarte i różnicowe
+% Implementacja kolejki FIFO, czyli:
+
+% a) init(Kolejka) - inicjalizacja kolejki (na pustą)
+
+% b) get(Elem, Kolejka, NowaKolejka) - pobranie
+
+% c) put(Elem, Kolejka, NowaKolejka) - wstawienie
+
+% d) empty(Kolejka) - czy kolejka pusta
+
+% wszerz(DrzewoBinarne, ListaWierzchWszerz)

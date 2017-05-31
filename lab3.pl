@@ -189,6 +189,8 @@ no
 
 /* kolejka ********************************************/
 
+% TODO difference list and queues explained
+
 % init(Kolejka) - inicjacja kolejki (na pustą)
 init(P-P).
 
