@@ -1,16 +1,14 @@
 % Piotr Jander
 
-% TODO
-% TODO we'd like debug messages when things dont go as expected
-% TODO is the determinism with green cuts everywhere okay?
-% TODO need to detect non-LR(0) grammar
+% TODO determinism, green cuts
+% TODO shift reduce conflicts reporting
 % TODO (aut, yes) albo (null, opis)
-% TODO maybe S → E eof
-% TODO am I sure a state is characterized by just one dotted item?
+% TODO is a state characterized by just one dotted item?
 % TODO as we complete closure, we might have a empty productions Beta -> [dot]
-% TODO maybe do BFS, then we add to queue and take from queue
-% TODO does it even make sense to add reduce states? only add reduce actions
-% after all, no need for consistent numbering
+% TODO try BFS with queue
+% TODO understand how if-then-else if a soft cut
+% TODO need to detect SLR(1) grammar? (follow set)
+% TODO acceptance conditions!!!
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
 :- dynamic regularized_gramar/2.
@@ -35,21 +33,96 @@ printnl(X) :-
 print_list(L) :-
     maplist(printnl, L).
 
-print_triples(Functor) :-
+gather_triples(Functor, L) :-
     P =.. [Functor, _X, _Y, _Z],
-    findall(P, P, L),
+    findall(P, P, L).
+
+print_triples(Functor) :-
+    gather_triples(Functor, L),
     print_list(L).
 
 %%%%%%%%%%%%%%%
 % createLR
 
-% createLR(gramatyka(StartSymbol, Productions), Automaton, Result) :-
-%     retract_automaton,
-%     retractall(gramatyka/2),
-%     regularize_productions(Productions, RegularizedProductions),
-%     assert(regularized_gramar(RegularizedProductions)),
-%     add_closure_state([], dotted_rule(nt('Z'), [dot, nt(StartSymbol)]), _, _).
-%     % at this point we're ready to gather all table relations
+% TODO report errors
+createLR(gramatyka(StartSymbol, Productions), Automaton, yes) :-
+    retract_automaton,
+    retractall(regularized_gramar/1),
+    regularize_productions(Productions, RegularizedProductions),
+    assert(regularized_gramar(RegularizedProductions)),
+    add_closure_state([], dotted_rule(nt('Z'), [dot, nt(StartSymbol), t('#')]), _, _),
+    gather_triples(shift, Shift),
+    gather_triples(reduce, Reduce),
+    gather_triples(goto, Goto),
+    append(Shift, Reduce, Actions),
+    append(Actions, Goto, ParsingTable),
+    Automaton = automaton(ParsingTable),
+    retract_automaton,
+    retractall(regularized_gramar/1).
+
+% test(+NazwaGramatyki, +ListaSlowDoZbadania)
+test(NG, ListaSlow) :-
+    grammar(NG, G),
+    createLR(G, Automat, yes),
+    checkWords(ListaSlow, Automat).
+
+checkWords([], _) :- write('Koniec testu.\n').
+checkWords([S|RS], Automat) :-
+    format(' Slowo: ~p ', [S]),
+    (accept(Automat, S) -> true; write('NIE ')),
+    write('nalezy.\n'),
+    checkWords(RS, Automat).
+
+grammar(
+    ex0, 
+    gramatyka(
+        'S', 
+        [
+            prod('S', [[nt('A'), nt('A')]]),
+            prod('A', [['a', nt('A')], ['b']])
+        ]
+    )
+).
+
+grammar(
+    ex1, 
+    gramatyka(
+        'E',
+        [
+            prod('E', [[nt('E'), '+', nt('T')], [nt('T')]]),
+            prod('T', [[id], ['(', nt('E'), ')']]) 
+        ]
+    )
+).
+
+grammar(
+    ex2, 
+    gramatyka(
+        'A', 
+        [
+            prod('A', [[nt('A'), x], [x]])
+        ]
+    )
+).
+
+run_tests :-
+    test(ex0, [[b,b, eof], [a,b,b, eof], [b,a,b, eof], [a,b,a,b, eof], [a,b,a,a,b, eof], [a,a,b,a,a,b, eof], [eof], [a,a, eof]]).
+
+    % accept(A, [b,b, eof]),
+    % accept(A, [a,b,b, eof]),
+    % accept(A, [b,a,b, eof]),
+    % accept(A, [a,b,a,b, eof]),
+    % accept(A, [a,b,a,a,b, eof]),
+    % accept(A, [a,a,b,a,a,b, eof]),
+
+    % \+ accept(A, [eof]),
+    % \+ accept(A, [a,a, eof]),  % up to here
+    % \+ accept(A, [b, eof]),
+    % \+ accept(A, [a,b, eof]),
+    % \+ accept(A, [b,b,a, eof]),
+    % \+ accept(A, [b,a,b,a, eof]),
+    % \+ accept(A, [b,b,b, eof]),
+    % \+ accept(A, [a,b,a,b,a,b, eof]).
 
 %%%%%%%%%%%%%%%%
 % construct automaton
@@ -245,8 +318,10 @@ retract_automaton :-
     retractall(goto_in(_, _, _)).
 
 accept(Automaton, Word) :-
+    retract_automaton,
     assertall(Automaton),
-    automaton(Word, [state(0)]),
+    automaton(Word, [nt('Z'), state(0)]),
+    % automaton(Word, [state(0)]),
     retract_automaton.
 
 automaton([], [state(accept)|_]) :- !.
