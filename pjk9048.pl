@@ -5,6 +5,8 @@
 % TODO is the determinism with green cuts everywhere okay?
 % TODO need to detect non-LR(0) grammar
 % TODO (aut, yes) albo (null, opis)
+% TODO mark params with +/- ?
+% TODO special symbols: dot, null
 
 % shift(State, Terminal, NewState).
 % reduce(State, Number, Nonterminal).
@@ -13,52 +15,110 @@
 %%%%%%%%%%%%%%%
 % createLR
 
-createLR(Grammar, Automaton, Result).
+% createLR(gramatyka(Start, Productions), Automaton, Result).
 
-% transform the grammar to convenient form
-% augment with Z
-% start with Z -> start production
-% make state-closure
-% states are arbitarily numbered
-% for each production in the closure, when . Sym, add a transition on symbol
+% % State stores states by number and first dotted rule
+% % Assume no state for the dotted rule yet
+% make_closure(FirstDottedRule, Productions, Automaton, Result, State) :-
+%     % state_add(State, FirstDottedRule, StateNumber, NewState),
+%     % now we've added the state
+%     % time to recursively complete the closure
+%     % look at Dotted Rule
+%     % look at Sym after dot
+%     % for each such Sym, add a transition, find or add new closure-state
+%     % first: dont add transtions, just complete the dotted rules in the closure
+%     % then map over this list
 
-% we can be filling the table on the go
-% complete the closure for the state
-% for each symbol after dot
-% if sym is terminal
-    % see if state already exists
-    % if not create one with closure
-        % if dot at the end, then add a reduce
-    % IMPORTANT: state is ident by the first dotted item
-    % add a shift
-% if sym is nt, then add a goto
+% make_dotted_rule(ExpandedDottedRules, NextDottedRule, EnqueuedDottedRules) :-
+%     NextDottedRule = dotted_rule(_, RightHandSide),
+%     symbol_after_dot(RightHandSide, Symbol),
+%     % now we have a symbol
 
-% state has its number and list of dotted items, where first one is unique to the state
-% first dotted item in state has the somewhere
-% all other dotted items have the dot in the middle
+% bar(State, DottedRule, StateNumber, NewState) :-
+%     % assume this state doesn't exist yet
+%     state_add(State, DottedRule, StateNumber, NewState),
 
-% actually, maybe no need to store the closure anywhere
-% just store states with the first ident production
-% for all other productions, just add transitions
-% the state machine is a graph: BFS or DFS?
-% in either case, need to mark nodes white/grey/black
-% could make states dynamic, or in a dictionary or list
-% if dict, then check sicstus, maybe impl own dict
+%     % base case
+%     dotted_rule(LHS, RHS) = DottedRule,
+%     symbol_after_dot(RHS, null),
+%     length(RHS, DottedRuleLength),
+%     ProductionLength is DottedRuleLength - 1,
+%     assert(reduce_in(StateNumber, ProductionLength, RHS))
+%     ;
+%     % normal case
+%     % make transition from the dotted rule
+%     % recurse with other dotted rules
+%     % passing state around seems pretty unwieldy
+%     % use assert as we don't require backtracking
 
-% dotted items: like productions prod, but with dot added
-% actually distrubute rhs to prod2(NT, RHS); this can be a dotted item
+% baz(State, DottedRule, ThisStateNumber, NewState) :-
+%     % get the transition
+%     dotted_rule(LHS, RHS) = DottedRule,
+%     advance_dot(RHS, RHSNew, Symbol),
+%     (
+%         state_has(State, dotted_rule(LHS, RHSNew), ThatStateNumber)
+%         ;
+%         % state not in state, call bar to create that new state
+%         bar(State, DottedRule, StateNumber, NewState)
+%     ),
+%     (
+%         t(Terminal) = Symbol,
+%         assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber))
+%         ;
+%         nt(Nonterminal) = Symbol,
+%         assert(goto_in(ThisStateNumber, Nonterminal, ThatStateNumber))
+%     ).
 
-% start: take start production, put a dot, make closure
+% time for some testing
 
-% when making the automaton
-% retract all relation desc automaton
-% dynamically add such relations
-% export those relations to a list
+advance_dot([dot, Symbol | RHS], [Symbol, dot | RHS], Symbol).
+advance_dot([First, Second | RHS], [First | RHSNew], Symbol) :-
+    advance_dot([Second | RHS], RHSNew, Symbol).
+
+symbol_after_dot([dot], null).
+symbol_after_dot([First, Second | RightHandSide], Symbol) :-
+    First = dot,
+    Second = Symbol
+    ;
+    symbol_after_dot([Second | RightHandSide], Symbol).
+
+test_symbol_after_dot :-
+    \+ symbol_after_dot([], _),
+    symbol_after_dot([dot], null),
+    symbol_after_dot([dot, t(a)], t(a)),
+    symbol_after_dot([t(b), dot, nt(a)], nt(a)).
+
+%%%%%%%%%%%%%%%%
+% List of closure states
+
+state_has([ClosureState|State], FirstDottedRule, StateNumber) :-
+    ClosureState = closure_state(FirstDottedRule, StateNumber)
+    ;
+    state_has(State, FirstDottedRule, StateNumber).
+
+state_add(State, FirstDottedRule, StateNumber, NewState) :-
+    State = [closure_state(_, PreviousStateNumber) | _],
+    StateNumber is PreviousStateNumber + 1,
+    NewState = [closure_state(FirstDottedRule, StateNumber) | State]
+    ;
+    State = [],
+    StateNumber = 0,
+    NewState = [closure_state(FirstDottedRule, StateNumber)].
+
+test_state :-
+    state_add([], foo, FooNum, FooState),
+    FooNum = 0,
+    state_add(FooState, bar, BarNum, State),
+    BarNum = 1,
+    state_has(State, bar, BarNum),
+    state_has(State, foo, FooNum),
+    \+ state_has(State, baz, _).
 
 %%%%%%%%%%%%%%%%%%%
 % example automaton
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
+:- dynamic closure_state/2.
 
 example_automaton([
     shift_in(0, a, 3),
