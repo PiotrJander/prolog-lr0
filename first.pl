@@ -609,3 +609,6 @@ pathC(A, B, Visited, [A|P]) :-
 % d) empty(Kolejka) - czy kolejka pusta
 
 % wszerz(DrzewoBinarne, ListaWierzchWszerz)
+
+inc(X, Y) :-
+    Y is X + 1.

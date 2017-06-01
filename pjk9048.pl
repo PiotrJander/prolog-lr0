@@ -7,9 +7,10 @@
 % TODO (aut, yes) albo (null, opis)
 % TODO mark params with +/- ?
 % TODO special symbols: dot, null
+% TODO how to use lib lists in sicstus? maplist
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
-:- dynamic gramatyka/2.
+:- dynamic regularized_gramar/2.
 
 %%%%%%%%%%%%%%%
 % createLR
@@ -46,6 +47,39 @@ gramatyka('S', [
     prod('S', [[nt('A'), nt('A')]]),
     prod('A', [['a', nt('A')], ['b']])
 ]).
+
+regularized_gramar([
+    prod(nt('S'), [[dot, nt('A'), nt('A')]]),
+    prod(nt('A'), [[dot, t('a'), nt('A')], [dot, t(b)]])
+]).
+
+regularize_grammar(gramatyka(_, Productions), regularized_gramar(RegularizedProductions)) :-
+    maplist(regularize_production, Productions, RegularizedProductions).
+    % regularize_productions(Productions, RegularizedProductions).
+
+% regularize_productions([], []).
+% regularize_productions([Prod | Productions], [RegProd | RegularizedProductions]) :-
+%     regularize_production(Prod, RegProd),
+%     regularize_productions(Productions, RegularizedProductions).
+
+regularize_production(prod(Nonterminal, RHSs), prod(nt(Nonterminal), RegRHSs)) :-
+    maplist(regularize_rhs, RHSs, RegRHSs).
+    % regularize_rhsides(RHSs RegRHSs).
+
+% regularize_rhsides([], []).
+% regularize_rhsides([RHS | RHSs], [RegRHS | RegRHSs]) :-
+%     regularize_rhs(RHS, RegRHS),
+%     regularize_rhsides(RHSs, RegRHSs).
+
+regularize_rhs(RHS, [dot|RegRHS]) :-
+    maplist(wrap_terminals, RHS, RegRHS).
+
+wrap_terminals(nt(S), nt(S)) :- !.
+wrap_terminals(S, t(S)).
+
+
+% the time when we take productions from the grammar is when we complete our closure
+% but then we have dot at start and terminals t(...)
 
 add_closure_state(G, DottedRule, StateNumber, NG) :-
     % assume this state doesn't exist yet
