@@ -7,9 +7,38 @@
 % TODO (aut, yes) albo (null, opis)
 % TODO maybe S → E eof
 % TODO am I sure a state is characterized by just one dotted item?
+% TODO as we complete closure, we might have a empty productions Beta -> [dot]
+% TODO maybe do BFS, then we add to queue and take from queue
+% TODO does it even make sense to add reduce states? only add reduce actions
+% after all, no need for consistent numbering
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
 :- dynamic regularized_gramar/2.
+
+portray(closure_state(DR, Num)) :-
+    print(Num),
+    write(':0 '),
+    print(DR).
+
+portray(dotted_rule(nt(LHS), RHS)) :-
+    print(LHS),
+    write('->'),
+    print(RHS).
+
+portray(dot) :-
+    write('.').
+
+printnl(X) :-
+    print(X),
+    nl.
+
+print_list(L) :-
+    maplist(printnl, L).
+
+print_triples(Functor) :-
+    P =.. [Functor, _X, _Y, _Z],
+    findall(P, P, L),
+    print_list(L).
 
 %%%%%%%%%%%%%%%
 % createLR
@@ -19,7 +48,7 @@
 %     retractall(gramatyka/2),
 %     regularize_productions(Productions, RegularizedProductions),
 %     assert(regularized_gramar(RegularizedProductions)),
-%     add_closure_state([], dotted_rule(nt('Z'), [nt(StartSymbol)]), _, _).
+%     add_closure_state([], dotted_rule(nt('Z'), [dot, nt(StartSymbol)]), _, _).
 %     % at this point we're ready to gather all table relations
 
 %%%%%%%%%%%%%%%%
@@ -27,22 +56,24 @@
 
 add_closure_state(G, DottedRule, StateNumber, NG) :-
     % assume this state doesn't exist yet
-    state_add(G, DottedRule, StateNumber, NG),
+    state_add(G, DottedRule, StateNumber, IntermediateG),
 
     % base case
-    dotted_rule(_, RHS) = DottedRule,
+    dotted_rule(LHS, RHS) = DottedRule,
     (
         % dot at the end of production, reduce
         dot_at_end_of_production(RHS),
         length(RHS, DottedRuleLength),
         ProductionLength is DottedRuleLength - 1,
-        assert(reduce_in(StateNumber, ProductionLength, RHS))
+        assert(reduce_in(StateNumber, ProductionLength, LHS)),
+        NG = IntermediateG
         ;
-        complete_closure_state(G, DottedRule, StateNumber, NG)
+        complete_closure_state(IntermediateG, DottedRule, StateNumber, NG)
     ).
 
-test_automaton_construction(NG) :-
-    add_closure_state([], dotted_rule(nt('Z'), [nt('S')]), _, NG).
+test_automaton_construction :-
+    add_closure_state([], dotted_rule(nt('Z'), [dot, nt('S')]), _, NG),
+    print_list(NG).
 
 complete_closure_state(G, dotted_rule(LHS, RHS), ThisStateNumber, NG) :-
     advance_dot(RHS, RHSNew, Symbol),
@@ -195,10 +226,8 @@ example_automaton([
 
 shift(state(From), t(Through), state(To)) :- shift_in(From, Through, To).
 
-reduce(state(S), SuccNumber, nt(Nonterminal)) :-
-    reduce_in(S, Number, Nonterminal),
-    % Number > 0, !,  % TODO trying to avoid inf loop
-    succs(Number, SuccNumber).
+reduce(state(S), Number, nt(Nonterminal)) :-
+    reduce_in(S, Number, Nonterminal).
 
 goto(state(From), nt(Through), state(To)) :- goto_in(From, Through, To).
 
@@ -236,9 +265,10 @@ automaton(Word, [State|Stack]) :-
 stack_reduce([State|Stack], 0, Nonterminal, [NewState,Nonterminal,State|Stack]) :- 
     !, 
     goto(State, Nonterminal, NewState).
-stack_reduce([_,_|Stack], succ(Number), Nonterminal, NewStack) :-
+stack_reduce([_,_|Stack], N, Nonterminal, NewStack) :-
     !,
-    stack_reduce(Stack, Number, Nonterminal, NewStack).
+    M is N - 1,
+    stack_reduce(Stack, M, Nonterminal, NewStack).
 
 %%%%%%%
 % tests
@@ -265,18 +295,3 @@ test_example :-
     \+ accept(A, [b,a,b,a, eof]),
     \+ accept(A, [b,b,b, eof]),
     \+ accept(A, [a,b,a,b,a,b, eof]).
-
-%%%%%%%%%
-% helpers
-
-% succs(0, _) :-
-%     write('Trying to unify 0 with non-zero.'), nl,
-%     fail.
-% succs(N, _) :-
-%     N < 0,
-%     write('Trying with a negative number'), nl,
-%     fail.
-succs(0, 0).
-succs(N, succ(S)) :-
-    M is N - 1,
-    succs(M, S).
