@@ -5,10 +5,8 @@
 % TODO is the determinism with green cuts everywhere okay?
 % TODO need to detect non-LR(0) grammar
 % TODO (aut, yes) albo (null, opis)
-% TODO mark params with +/- ?
-% TODO special symbols: dot, null
-% TODO how to use lib lists in sicstus? maplist
-% TODO regularize grammar haskell style: anonymous predicates?
+% TODO maybe S → E eof
+% TODO am I sure a state is characterized by just one dotted item?
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
 :- dynamic regularized_gramar/2.
@@ -16,12 +14,63 @@
 %%%%%%%%%%%%%%%
 % createLR
 
-% createLR(Grammar, Automaton, Result) :-
+% createLR(gramatyka(StartSymbol, Productions), Automaton, Result) :-
 %     retract_automaton,
 %     retractall(gramatyka/2),
-%     % invariant: only one grammar at a time    
-%     assert(Grammar),
-%     % TODO get all automaton relation and put into list, export as automaton
+%     regularize_productions(Productions, RegularizedProductions),
+%     assert(regularized_gramar(RegularizedProductions)),
+%     add_closure_state([], dotted_rule(nt('Z'), [nt(StartSymbol)]), _, _).
+%     % at this point we're ready to gather all table relations
+
+%%%%%%%%%%%%%%%%
+% construct automaton
+
+add_closure_state(G, DottedRule, StateNumber, NG) :-
+    % assume this state doesn't exist yet
+    state_add(G, DottedRule, StateNumber, NG),
+
+    % base case
+    dotted_rule(_, RHS) = DottedRule,
+    (
+        % dot at the end of production, reduce
+        dot_at_end_of_production(RHS),
+        length(RHS, DottedRuleLength),
+        ProductionLength is DottedRuleLength - 1,
+        assert(reduce_in(StateNumber, ProductionLength, RHS))
+        ;
+        complete_closure_state(G, DottedRule, StateNumber, NG)
+    ).
+
+test_automaton_construction(NG) :-
+    add_closure_state([], dotted_rule(nt('Z'), [nt('S')]), _, NG).
+
+complete_closure_state(G, dotted_rule(LHS, RHS), ThisStateNumber, NG) :-
+    advance_dot(RHS, RHSNew, Symbol),
+
+    % get or add the next closure state
+    (
+        state_has(G, dotted_rule(LHS, RHSNew), ThatStateNumber),
+        IntermediateG = G
+        ;
+        add_closure_state(G, dotted_rule(LHS, RHSNew), ThatStateNumber, IntermediateG)
+    ),
+    (
+        t(Terminal) = Symbol,
+        assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber)),
+        NG = IntermediateG
+        ;
+        nt(Nonterminal) = Symbol,
+        assert(goto_in(ThisStateNumber, Nonterminal, ThatStateNumber)),
+
+        % nonterminal, so keep completing the closure
+        productions_for_nonterminal(nt(Nonterminal), NonterminalProductions),
+        complete_closure_state1(IntermediateG, nt(Nonterminal), NonterminalProductions, ThisStateNumber, NG)
+    ).
+
+complete_closure_state1(G, _, [], _, G).
+complete_closure_state1(G, Nonterminal, [NontProd|NonterminalProductions], ThisStateNumber, NG) :-
+    complete_closure_state(G, dotted_rule(Nonterminal, NontProd), ThisStateNumber, IntermediateG),
+    complete_closure_state1(IntermediateG, Nonterminal, NonterminalProductions, ThisStateNumber, NG).
 
 %%%%%%%%%%%%
 % Regularize grammar
@@ -69,62 +118,6 @@ test_productions_for_nonterminal :-
     productions_for_nonterminal(nt('S'), [[dot, nt('A'), nt('A')]]),
     productions_for_nonterminal(nt('A'), [[dot, t('a'), nt('A')], [dot, t(b)]]).
 
-%%%%%%%%%%%%%%%%
-% construct automaton
-
-% add_closure_state(G, DottedRule, StateNumber, NG) :-
-%     % assume this state doesn't exist yet
-%     state_add(G, DottedRule, StateNumber, NG),
-
-%     % base case
-%     dotted_rule(LHS, RHS) = DottedRule,
-%     advance_dot(RHS, NewRHS, Symbol),
-%     (
-%         % dot at the end of production, reduce
-%         Symbol = dot
-%         length(RHS, DottedRuleLength),
-%         ProductionLength is DottedRuleLength - 1,
-%         assert(reduce_in(StateNumber, ProductionLength, RHS))
-%         ;
-%         % dot in the middle
-%     )
-    
-%     ;
-%     % normal case
-%     % make transition from the dotted rule
-%     % recurse with other dotted rules
-%     % passing state around seems pretty unwieldy
-%     % use assert as we don't require backtracking
-
-% complete_closure_state(G, DottedRule, ThisStateNumber, NG) :-
-%     dotted_rule(LHS, RHS) = DottedRule,
-%     advance_dot(RHS, RHSNew, Symbol),
-
-%     % get or add the next closure state
-%     (
-%         state_has(G, dotted_rule(RHS, RHSNew), ThatStateNumber),
-%         IntermediateG = G
-%         ;
-%         add_closure_state(G, DottedRule, StateNumber, IntermediateG)
-%     ),
-%     (
-%         t(Terminal) = Symbol,
-%         assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber)),
-%         NG = IntermediateG
-%         ;
-%         nt(Nonterminal) = Symbol,
-%         assert(goto_in(ThisStateNumber, Nonterminal, ThatStateNumber))
-
-%         % nonterminal, so keep completing the closure
-%         productions_for_nonterminal(nt(Nonterminal), NonterminalProductions),
-%         complete_closure_state_for1(IntermediateG, nt(Nonterminal), NonterminalProductions, ThisStateNumber, NG)
-%     ).
-
-% complete_closure_state_for1(G, _, [], _, G) :-
-% complete_closure_state_for1(G, Nonterminal, [NontProd|NonterminalProductions], ThisStateNumber, NG) :-
-%     complete_closure_state(G, dotted_rule(Nonterminal, NontProd), ThisStateNumber, IntermediateG),
-%     foo(IntermediateG, NonterminalProductions, ThisStateNumber, NG).
-
 %%%%%%%%%%%%%%
 % Manipulating dotted rules
 
@@ -147,17 +140,6 @@ test_dot_at_end_of_production :-
     dot_at_end_of_production([dot]),
     dot_at_end_of_production([nt(a), t(b), dot]),
     \+ dot_at_end_of_production([nt(a), dot, t(b)]).
-
-% symbol_after_dot([dot], null).
-% symbol_after_dot([dot, Symbol | _], Symbol).
-% symbol_after_dot([_, Second | RightHandSide], Symbol) :-
-%     symbol_after_dot([Second | RightHandSide], Symbol).
-
-% test_symbol_after_dot :-
-%     \+ symbol_after_dot([], _),
-%     symbol_after_dot([dot], null),
-%     symbol_after_dot([dot, t(a)], t(a)),
-%     symbol_after_dot([t(b), dot, nt(a)], nt(a)).
 
 %%%%%%%%%%%%%%%%
 % List of closure states
@@ -245,7 +227,6 @@ automaton([Symbol|Word], [State|Stack]) :-  % we'd like the invariant that State
     automaton(Word, [NewState, t(Symbol), State | Stack]).
 automaton(Word, [State|Stack]) :-
     reduce(State, Number, Nonterminal),  % if we have a reduce action
-    !,
     stack_reduce([State|Stack], Number, Nonterminal, NewStack),  % then we reduce (and go to new state)
     automaton(Word, NewStack).
 
