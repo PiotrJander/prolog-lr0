@@ -8,14 +8,18 @@
 % TODO mark params with +/- ?
 % TODO special symbols: dot, null
 
-% shift(State, Terminal, NewState).
-% reduce(State, Number, Nonterminal).
-% goto(State, Nonterminal, NewState).
+:- dynamic shift_in/3, reduce_in/3, goto_in/3.
+:- dynamic gramatyka/2.
 
 %%%%%%%%%%%%%%%
 % createLR
 
-% createLR(gramatyka(Start, Productions), Automaton, Result).
+% createLR(Grammar, Automaton, Result) :-
+%     retract_automaton,
+%     retractall(gramatyka/2),
+%     % invariant: only one grammar at a time    
+%     assert(Grammar),
+%     % TODO get all automaton relation and put into list, export as automaton
 
 % % State stores states by number and first dotted rule
 % % Assume no state for the dotted rule yet
@@ -34,52 +38,69 @@
 %     symbol_after_dot(RightHandSide, Symbol),
 %     % now we have a symbol
 
-% bar(State, DottedRule, StateNumber, NewState) :-
-%     % assume this state doesn't exist yet
-%     state_add(State, DottedRule, StateNumber, NewState),
+gramatyka(’E’,
+[prod(’E’, [[nt(’E’), ’+’, nt(’T’)], [nt(’T’)]]),
+prod(’T’, [[id], [’(’, nt(’E’), ’)’]]) ]).
 
-%     % base case
-%     dotted_rule(LHS, RHS) = DottedRule,
-%     symbol_after_dot(RHS, null),
-%     length(RHS, DottedRuleLength),
-%     ProductionLength is DottedRuleLength - 1,
-%     assert(reduce_in(StateNumber, ProductionLength, RHS))
-%     ;
-%     % normal case
-%     % make transition from the dotted rule
-%     % recurse with other dotted rules
-%     % passing state around seems pretty unwieldy
-%     % use assert as we don't require backtracking
+gramatyka('S', [
+    prod('S', [[nt('A'), nt('A')]]),
+    prod('A', [['a', nt('A')], ['b']])
+]).
 
-% baz(State, DottedRule, ThisStateNumber, NewState) :-
-%     % get the transition
-%     dotted_rule(LHS, RHS) = DottedRule,
-%     advance_dot(RHS, RHSNew, Symbol),
-%     (
-%         state_has(State, dotted_rule(LHS, RHSNew), ThatStateNumber)
-%         ;
-%         % state not in state, call bar to create that new state
-%         bar(State, DottedRule, StateNumber, NewState)
-%     ),
-%     (
-%         t(Terminal) = Symbol,
-%         assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber))
-%         ;
-%         nt(Nonterminal) = Symbol,
-%         assert(goto_in(ThisStateNumber, Nonterminal, ThatStateNumber))
-%     ).
+add_closure_state(G, DottedRule, StateNumber, NG) :-
+    % assume this state doesn't exist yet
+    state_add(G, DottedRule, StateNumber, NG),
 
-% time for some testing
+    % base case
+    dotted_rule(LHS, RHS) = DottedRule,
+    symbol_after_dot(RHS, null),
+    length(RHS, DottedRuleLength),
+    ProductionLength is DottedRuleLength - 1,
+    assert(reduce_in(StateNumber, ProductionLength, RHS))
+    ;
+    % normal case
+    % make transition from the dotted rule
+    % recurse with other dotted rules
+    % passing state around seems pretty unwieldy
+    % use assert as we don't require backtracking
+
+complete_closure_state(G, DottedRule, ThisStateNumber, NG) :-
+    dotted_rule(LHS, RHS) = DottedRule,
+    advance_dot(RHS, RHSNew, Symbol),
+
+    % get or add the next closure state
+    (
+        state_has(G, dotted_rule(LHS, RHSNew), ThatStateNumber),
+        NG = State
+        ;
+        add_closure_state(G, DottedRule, StateNumber, NG)
+    ),
+    (
+        t(Terminal) = Symbol,
+        assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber))
+        ;
+        nt(Nonterminal) = Symbol,
+        assert(goto_in(ThisStateNumber, Nonterminal, ThatStateNumber))
+        % notterminal, so complete closure
+        % need grammar passed
+        % but grammar is static, so maybe simply assert it
+    ).
+
+%%%%%%%%%%%%%%
+% Manipulating dotted rules
 
 advance_dot([dot, Symbol | RHS], [Symbol, dot | RHS], Symbol).
 advance_dot([First, Second | RHS], [First | RHSNew], Symbol) :-
     advance_dot([Second | RHS], RHSNew, Symbol).
 
+test_advance_dot :-
+    advance_dot([dot, t(a)], [t(a), dot], t(a)),
+    advance_dot([t(a), dot, t(b)], [t(a), t(b), dot], t(b)),
+    \+ advance_dot([t(a), dot], _, _).
+
 symbol_after_dot([dot], null).
+symbol_after_dot([dot, Symbol | RightHandSide], Symbol).
 symbol_after_dot([First, Second | RightHandSide], Symbol) :-
-    First = dot,
-    Second = Symbol
-    ;
     symbol_after_dot([Second | RightHandSide], Symbol).
 
 test_symbol_after_dot :-
@@ -91,34 +112,35 @@ test_symbol_after_dot :-
 %%%%%%%%%%%%%%%%
 % List of closure states
 
-state_has([ClosureState|State], FirstDottedRule, StateNumber) :-
+state_has([ClosureState|G], FirstDottedRule, StateNumber) :-
     ClosureState = closure_state(FirstDottedRule, StateNumber)
     ;
-    state_has(State, FirstDottedRule, StateNumber).
+    state_has(G, FirstDottedRule, StateNumber).
 
-state_add(State, FirstDottedRule, StateNumber, NewState) :-
-    State = [closure_state(_, PreviousStateNumber) | _],
+state_add(G, FirstDottedRule, StateNumber, NG) :-
+    G = [closure_state(_, PreviousStateNumber) | _],
     StateNumber is PreviousStateNumber + 1,
-    NewState = [closure_state(FirstDottedRule, StateNumber) | State]
+    NG = [closure_state(FirstDottedRule, StateNumber) | G]
     ;
-    State = [],
+    G = [],
     StateNumber = 0,
-    NewState = [closure_state(FirstDottedRule, StateNumber)].
+    NG = [closure_state(FirstDottedRule, StateNumber)].
 
 test_state :-
-    state_add([], foo, FooNum, FooState),
+    state_add([], foo, FooNum, FooG),
     FooNum = 0,
-    state_add(FooState, bar, BarNum, State),
+    state_add(FooG, bar, BarNum, G),
     BarNum = 1,
-    state_has(State, bar, BarNum),
-    state_has(State, foo, FooNum),
-    \+ state_has(State, baz, _).
+    state_has(G, bar, BarNum),
+    state_has(G, foo, FooNum),
+    \+ state_has(G, baz, _).
 
 %%%%%%%%%%%%%%%%%%%
 % example automaton
 
-:- dynamic shift_in/3, reduce_in/3, goto_in/3.
-:- dynamic closure_state/2.
+% shift(State, Terminal, NewState).
+% reduce(State, Number, Nonterminal).
+% goto(State, Nonterminal, NewState).
 
 example_automaton([
     shift_in(0, a, 3),
