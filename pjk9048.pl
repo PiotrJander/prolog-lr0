@@ -8,6 +8,7 @@
 % TODO mark params with +/- ?
 % TODO special symbols: dot, null
 % TODO how to use lib lists in sicstus? maplist
+% TODO regularize grammar haskell style: anonymous predicates?
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
 :- dynamic regularized_gramar/2.
@@ -22,22 +23,8 @@
 %     assert(Grammar),
 %     % TODO get all automaton relation and put into list, export as automaton
 
-% % State stores states by number and first dotted rule
-% % Assume no state for the dotted rule yet
-% make_closure(FirstDottedRule, Productions, Automaton, Result, State) :-
-%     % state_add(State, FirstDottedRule, StateNumber, NewState),
-%     % now we've added the state
-%     % time to recursively complete the closure
-%     % look at Dotted Rule
-%     % look at Sym after dot
-%     % for each such Sym, add a transition, find or add new closure-state
-%     % first: dont add transtions, just complete the dotted rules in the closure
-%     % then map over this list
-
-% make_dotted_rule(ExpandedDottedRules, NextDottedRule, EnqueuedDottedRules) :-
-%     NextDottedRule = dotted_rule(_, RightHandSide),
-%     symbol_after_dot(RightHandSide, Symbol),
-%     % now we have a symbol
+%%%%%%%%%%%%
+% Regularize grammar
 
 gramatyka('S', [
     prod('S', [[nt('A'), nt('A')]]),
@@ -66,6 +53,25 @@ test_regularize_grammar :-
     regularized_grammar(RegularizedProductions),
     regularize_productions(Productions, RegularizedProductions).
 
+%%%%%%%%%%%%
+% Productions for nonterminal
+
+productions_for_nonterminal(Nonterminal, NonterminalProductions) :-
+    regularized_grammar(Productions),
+    productions_for_nonterminal1(Nonterminal, Productions, NonterminalProductions).
+
+productions_for_nonterminal1(Nonterminal, [NonProd|Productions], NonterminalProductions) :-
+    prod(Nonterminal, NonterminalProductions) = NonProd
+    ;
+    productions_for_nonterminal1(Nonterminal, Productions, NonterminalProductions).
+
+test_productions_for_nonterminal :-
+    productions_for_nonterminal(nt('S'), [[dot, nt('A'), nt('A')]]),
+    productions_for_nonterminal(nt('A'), [[dot, t('a'), nt('A')], [dot, t(b)]]).
+
+%%%%%%%%%%%%%%%%
+% construct automaton
+
 % the time when we take productions from the grammar is when we complete our closure
 % but then we have dot at start and terminals t(...)
 
@@ -92,7 +98,7 @@ test_regularize_grammar :-
 
 %     % get or add the next closure state
 %     (
-%         state_has(G, dotted_rule(LHS, RHSNew), ThatStateNumber),
+%         state_has(G, dotted_rule(RHS, RHSNew), ThatStateNumber),
 %         NG = State
 %         ;
 %         add_closure_state(G, DottedRule, StateNumber, NG)
@@ -103,9 +109,10 @@ test_regularize_grammar :-
 %         ;
 %         nt(Nonterminal) = Symbol,
 %         assert(goto_in(ThisStateNumber, Nonterminal, ThatStateNumber))
-%         % notterminal, so complete closure
-%         % need grammar passed
-%         % but grammar is static, so maybe simply assert it
+
+%         % nonterminal, so complete closure
+%         % get all productions for the nonterminal
+%         % for each production, do complete closure state
 %     ).
 
 %%%%%%%%%%%%%%
