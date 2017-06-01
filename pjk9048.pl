@@ -72,19 +72,23 @@ test_productions_for_nonterminal :-
 %%%%%%%%%%%%%%%%
 % construct automaton
 
-% the time when we take productions from the grammar is when we complete our closure
-% but then we have dot at start and terminals t(...)
-
 % add_closure_state(G, DottedRule, StateNumber, NG) :-
 %     % assume this state doesn't exist yet
 %     state_add(G, DottedRule, StateNumber, NG),
 
 %     % base case
 %     dotted_rule(LHS, RHS) = DottedRule,
-%     symbol_after_dot(RHS, null),
-%     length(RHS, DottedRuleLength),
-%     ProductionLength is DottedRuleLength - 1,
-%     assert(reduce_in(StateNumber, ProductionLength, RHS))
+%     advance_dot(RHS, NewRHS, Symbol),
+%     (
+%         % dot at the end of production, reduce
+%         Symbol = dot
+%         length(RHS, DottedRuleLength),
+%         ProductionLength is DottedRuleLength - 1,
+%         assert(reduce_in(StateNumber, ProductionLength, RHS))
+%         ;
+%         % dot in the middle
+%     )
+    
 %     ;
 %     % normal case
 %     % make transition from the dotted rule
@@ -99,44 +103,61 @@ test_productions_for_nonterminal :-
 %     % get or add the next closure state
 %     (
 %         state_has(G, dotted_rule(RHS, RHSNew), ThatStateNumber),
-%         NG = State
+%         IntermediateG = G
 %         ;
-%         add_closure_state(G, DottedRule, StateNumber, NG)
+%         add_closure_state(G, DottedRule, StateNumber, IntermediateG)
 %     ),
 %     (
 %         t(Terminal) = Symbol,
-%         assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber))
+%         assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber)),
+%         NG = IntermediateG
 %         ;
 %         nt(Nonterminal) = Symbol,
 %         assert(goto_in(ThisStateNumber, Nonterminal, ThatStateNumber))
 
-%         % nonterminal, so complete closure
-%         % get all productions for the nonterminal
-%         % for each production, do complete closure state
+%         % nonterminal, so keep completing the closure
+%         productions_for_nonterminal(nt(Nonterminal), NonterminalProductions),
+%         complete_closure_state_for1(IntermediateG, nt(Nonterminal), NonterminalProductions, ThisStateNumber, NG)
 %     ).
+
+% complete_closure_state_for1(G, _, [], _, G) :-
+% complete_closure_state_for1(G, Nonterminal, [NontProd|NonterminalProductions], ThisStateNumber, NG) :-
+%     complete_closure_state(G, dotted_rule(Nonterminal, NontProd), ThisStateNumber, IntermediateG),
+%     foo(IntermediateG, NonterminalProductions, ThisStateNumber, NG).
 
 %%%%%%%%%%%%%%
 % Manipulating dotted rules
 
+advance_dot([dot], [dot], null).
 advance_dot([dot, Symbol | RHS], [Symbol, dot | RHS], Symbol).
 advance_dot([First, Second | RHS], [First | RHSNew], Symbol) :-
     advance_dot([Second | RHS], RHSNew, Symbol).
 
 test_advance_dot :-
+    advance_dot([dot], [dot], null),
     advance_dot([dot, t(a)], [t(a), dot], t(a)),
     advance_dot([t(a), dot, t(b)], [t(a), t(b), dot], t(b)),
     \+ advance_dot([t(a), dot], _, _).
 
-symbol_after_dot([dot], null).
-symbol_after_dot([dot, Symbol | _], Symbol).
-symbol_after_dot([_, Second | RightHandSide], Symbol) :-
-    symbol_after_dot([Second | RightHandSide], Symbol).
+dot_at_end_of_production([dot]).
+dot_at_end_of_production([dot|_]) :- false.
+dot_at_end_of_production([_|RHS]) :- dot_at_end_of_production(RHS).
 
-test_symbol_after_dot :-
-    \+ symbol_after_dot([], _),
-    symbol_after_dot([dot], null),
-    symbol_after_dot([dot, t(a)], t(a)),
-    symbol_after_dot([t(b), dot, nt(a)], nt(a)).
+test_dot_at_end_of_production :-
+    dot_at_end_of_production([dot]),
+    dot_at_end_of_production([nt(a), t(b), dot]),
+    \+ dot_at_end_of_production([nt(a), dot, t(b)]).
+
+% symbol_after_dot([dot], null).
+% symbol_after_dot([dot, Symbol | _], Symbol).
+% symbol_after_dot([_, Second | RightHandSide], Symbol) :-
+%     symbol_after_dot([Second | RightHandSide], Symbol).
+
+% test_symbol_after_dot :-
+%     \+ symbol_after_dot([], _),
+%     symbol_after_dot([dot], null),
+%     symbol_after_dot([dot, t(a)], t(a)),
+%     symbol_after_dot([t(b), dot, nt(a)], nt(a)).
 
 %%%%%%%%%%%%%%%%
 % List of closure states
