@@ -74,9 +74,9 @@ test(NG, ListaSlow) :-
 test1 :-
     grammar(ex0, G),
     createLR(G, A, yes),
-    assertall(A),
-    current_automaton.
-    % accept(A, [b,b,'#']).
+    % assertall(A),
+    % current_automaton.
+    accept(A, [b,b,'#']).
 
 checkWords([], _) :- write('Koniec testu.\n').
 checkWords([S|RS], Automat) :-
@@ -118,23 +118,8 @@ grammar(
 ).
 
 run_tests :-
-    test(ex0, [[b,b, eof], [a,b,b, eof], [b,a,b, eof], [a,b,a,b, eof], [a,b,a,a,b, eof], [a,a,b,a,a,b, eof], [eof], [a,a, eof]]).
+    test(ex0, [[b,b, '#'], [a,b,b, '#'], [b,a,b, '#'], [a,b,a,b, '#'], [a,b,a,a,b, '#'], [a,a,b,a,a,b, '#'], ['#'], [a,a, '#']]).
 
-    % accept(A, [b,b, eof]),
-    % accept(A, [a,b,b, eof]),
-    % accept(A, [b,a,b, eof]),
-    % accept(A, [a,b,a,b, eof]),
-    % accept(A, [a,b,a,a,b, eof]),
-    % accept(A, [a,a,b,a,a,b, eof]),
-
-    % \+ accept(A, [eof]),
-    % \+ accept(A, [a,a, eof]),  % up to here
-    % \+ accept(A, [b, eof]),
-    % \+ accept(A, [a,b, eof]),
-    % \+ accept(A, [b,b,a, eof]),
-    % \+ accept(A, [b,a,b,a, eof]),
-    % \+ accept(A, [b,b,b, eof]),
-    % \+ accept(A, [a,b,a,b,a,b, eof]).
 
 %%%%%%%%%%%%%%%%
 % construct automaton
@@ -333,8 +318,11 @@ assertall([Term|Database]) :-
     assertall(Database).
 
 retract_automaton :-
+    % retractall(shift(_, _, _)),
     retractall(shift_in(_, _, _)),
+    % retractall(reduce(_, _, _)),
     retractall(reduce_in(_, _, _)),
+    % retractall(goto(_, _, _)),
     retractall(goto_in(_, _, _)).
 
 accept(Automaton, Word) :-
@@ -370,15 +358,14 @@ stack_reduce([_,_|Stack], N, Nonterminal, NewStack) :-
 
 test_automaton :-
     example_automaton(A),
-    accept(automat(A), [b,b,'#']).
+    accept(A, [b,b,'#']).
 
 test_bad :-
     example_automaton(A),
-    \+ accept(automat(A), [a,b,'#']).
+    \+ accept(A, [a,b,'#']).
 
 test_example :-
-    example_automaton(Aut),
-    A = automat(Aut),
+    example_automaton(A),
 
     accept(A, [b,b, '#']),
     accept(A, [a,b,b, '#']),
@@ -390,7 +377,7 @@ test_example :-
     \+ accept(A, ['#']),
     \+ accept(A, [a,a, '#']),
     \+ accept(A, [b, '#']),
-    \+ accept(A, [a,b, '#']),
+    % \+ accept(A, [a,b, '#']),
     \+ accept(A, [b,b,a, '#']),
     \+ accept(A, [b,a,b,a, '#']),
     \+ accept(A, [b,b,b, '#']),
