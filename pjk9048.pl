@@ -5,10 +5,10 @@
 % TODO (aut, yes) albo (null, opis)
 % TODO is a state characterized by just one dotted item?
 % TODO as we complete closure, we might have a empty productions Beta -> [dot]
-% TODO try BFS with queue
-% TODO understand how if-then-else if a soft cut
-% TODO need to detect SLR(1) grammar? (follow set)
 % TODO acceptance conditions!!!
+% TODO start nonterminal Z on the stack
+% TODO start production Z -> S #, shift on # to accept
+% TODO add a goto to accept state after start nt reduction
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
 :- dynamic regularized_gramar/2.
@@ -50,6 +50,7 @@ createLR(gramatyka(StartSymbol, Productions), Automaton, yes) :-
     retractall(regularized_gramar/1),
     regularize_productions(Productions, RegularizedProductions),
     assert(regularized_gramar(RegularizedProductions)),
+    assert(goto_in(0, 'Z', accept)),
     add_closure_state([], dotted_rule(nt('Z'), [dot, nt(StartSymbol), t('#')]), _, _),
     gather_triples(shift, Shift),
     gather_triples(reduce, Reduce),
@@ -65,6 +66,12 @@ test(NG, ListaSlow) :-
     grammar(NG, G),
     createLR(G, Automat, yes),
     checkWords(ListaSlow, Automat).
+
+test1 :-
+    grammar(ex0, G),
+    createLR(G, A, yes),
+    assertall(A).
+    % accept(A, [b,b,'#']).
 
 checkWords([], _) :- write('Koniec testu.\n').
 checkWords([S|RS], Automat) :-
@@ -159,6 +166,10 @@ complete_closure_state(G, dotted_rule(LHS, RHS), ThisStateNumber, NG) :-
         add_closure_state(G, dotted_rule(LHS, RHSNew), ThatStateNumber, IntermediateG)
     ),
     (
+        % t('#') = Symbol,
+        % assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber)),
+        % NG = IntermediateG
+        % ;
         t(Terminal) = Symbol,
         assert(shift_in(ThisStateNumber, Terminal, ThatStateNumber)),
         NG = IntermediateG
@@ -281,20 +292,22 @@ test_state :-
 example_automaton([
     shift_in(0, a, 3),
     shift_in(0, b, 4),
-    shift_in(1, eof, accept),
+    shift_in(1, '#', 7),
     shift_in(2, a, 3),
     shift_in(2, b, 4),
     shift_in(3, a, 3),
     shift_in(3, b, 4),
 
-    reduce_in(4, 1, a),
-    reduce_in(5, 2, s),
-    reduce_in(6, 2, a),
+    reduce_in(4, 1, 'A'),
+    reduce_in(5, 2, 'S'),
+    reduce_in(6, 2, 'A'),
+    reduce_in(7, 2, 'Z'),
 
-    goto_in(0, a, 2),
-    goto_in(0, s, 1),
-    goto_in(2, a, 5),
-    goto_in(3, a, 6)
+    goto_in(0, 'A', 2),
+    goto_in(0, 'S', 1),
+    goto_in(0, 'Z', accept),
+    goto_in(2, 'A', 5),
+    goto_in(3, 'A', 6)
 ]).
 
 shift(state(From), t(Through), state(To)) :- shift_in(From, Through, To).
@@ -320,8 +333,8 @@ retract_automaton :-
 accept(Automaton, Word) :-
     retract_automaton,
     assertall(Automaton),
-    automaton(Word, [nt('Z'), state(0)]),
-    % automaton(Word, [state(0)]),
+    % automaton(Word, [nt('Z'), state(0)]),
+    automaton(Word, [state(0)]),
     retract_automaton.
 
 automaton([], [state(accept)|_]) :- !.
@@ -350,23 +363,23 @@ stack_reduce([_,_|Stack], N, Nonterminal, NewStack) :-
 
 test_automaton :-
     example_automaton(A),
-    accept(A, [b,b,eof]).
+    accept(A, [b,b,'#']).
 
 test_example :-
     example_automaton(A),
 
-    accept(A, [b,b, eof]),
-    accept(A, [a,b,b, eof]),
-    accept(A, [b,a,b, eof]),
-    accept(A, [a,b,a,b, eof]),
-    accept(A, [a,b,a,a,b, eof]),
-    accept(A, [a,a,b,a,a,b, eof]),
+    accept(A, [b,b, '#']),
+    accept(A, [a,b,b, '#']),
+    accept(A, [b,a,b, '#']),
+    accept(A, [a,b,a,b, '#']),
+    accept(A, [a,b,a,a,b, '#']),
+    accept(A, [a,a,b,a,a,b, '#']),
 
-    \+ accept(A, [eof]),
-    \+ accept(A, [a,a, eof]),
-    \+ accept(A, [b, eof]),
-    \+ accept(A, [a,b, eof]),
-    \+ accept(A, [b,b,a, eof]),
-    \+ accept(A, [b,a,b,a, eof]),
-    \+ accept(A, [b,b,b, eof]),
-    \+ accept(A, [a,b,a,b,a,b, eof]).
+    \+ accept(A, ['#']),
+    \+ accept(A, [a,a, '#']),
+    \+ accept(A, [b, '#']),
+    \+ accept(A, [a,b, '#']),
+    \+ accept(A, [b,b,a, '#']),
+    \+ accept(A, [b,a,b,a, '#']),
+    \+ accept(A, [b,b,b, '#']),
+    \+ accept(A, [a,b,a,b,a,b, '#']).
