@@ -15,10 +15,10 @@
 
 portray(closure_state(DR, Num)) :-
     print(Num),
-    write(':0 '),
+    write(': '),
     print(DR).
 
-portray(dotted_rule(nt(LHS), RHS)) :-
+portray(dotted_rule(LHS, RHS)) :-
     print(LHS),
     write('->'),
     print(RHS).
@@ -41,11 +41,16 @@ print_triples(Functor) :-
     gather_triples(Functor, L),
     print_list(L).
 
+current_automaton :-
+    print_triples(shift),
+    print_triples(goto),
+    print_triples(reduce).
+
 %%%%%%%%%%%%%%%
 % createLR
 
 % TODO report errors
-createLR(gramatyka(StartSymbol, Productions), Automaton, yes) :-
+createLR(gramatyka(StartSymbol, Productions), ParsingTable, yes) :-
     retract_automaton,
     retractall(regularized_gramar/1),
     regularize_productions(Productions, RegularizedProductions),
@@ -57,7 +62,6 @@ createLR(gramatyka(StartSymbol, Productions), Automaton, yes) :-
     gather_triples(goto, Goto),
     append(Shift, Reduce, Actions),
     append(Actions, Goto, ParsingTable),
-    Automaton = automaton(ParsingTable),
     retract_automaton,
     retractall(regularized_gramar/1).
 
@@ -70,7 +74,8 @@ test(NG, ListaSlow) :-
 test1 :-
     grammar(ex0, G),
     createLR(G, A, yes),
-    assertall(A).
+    assertall(A),
+    current_automaton.
     % accept(A, [b,b,'#']).
 
 checkWords([], _) :- write('Koniec testu.\n').
@@ -145,7 +150,8 @@ add_closure_state(G, DottedRule, StateNumber, NG) :-
         dot_at_end_of_production(RHS),
         length(RHS, DottedRuleLength),
         ProductionLength is DottedRuleLength - 1,
-        assert(reduce_in(StateNumber, ProductionLength, LHS)),
+        nt(NT) = LHS,
+        assert(reduce_in(StateNumber, ProductionLength, NT)),
         NG = IntermediateG
         ;
         complete_closure_state(IntermediateG, DottedRule, StateNumber, NG)
@@ -161,6 +167,7 @@ complete_closure_state(G, dotted_rule(LHS, RHS), ThisStateNumber, NG) :-
     % get or add the next closure state
     (
         state_has(G, dotted_rule(LHS, RHSNew), ThatStateNumber),
+        !,  % TODO red cut
         IntermediateG = G
         ;
         add_closure_state(G, dotted_rule(LHS, RHSNew), ThatStateNumber, IntermediateG)
@@ -363,10 +370,15 @@ stack_reduce([_,_|Stack], N, Nonterminal, NewStack) :-
 
 test_automaton :-
     example_automaton(A),
-    accept(A, [b,b,'#']).
+    accept(automat(A), [b,b,'#']).
+
+test_bad :-
+    example_automaton(A),
+    \+ accept(automat(A), [a,b,'#']).
 
 test_example :-
-    example_automaton(A),
+    example_automaton(Aut),
+    A = automat(Aut),
 
     accept(A, [b,b, '#']),
     accept(A, [a,b,b, '#']),
