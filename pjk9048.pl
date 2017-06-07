@@ -1,14 +1,16 @@
 % Piotr Jander
 
-% TODO determinism, green cuts
-% TODO shift reduce conflicts reporting
-% TODO (aut, yes) albo (null, opis)
-% TODO is a state characterized by just one dotted item?
-% TODO as we complete closure, we might have a empty productions Beta -> [dot]
-% TODO acceptance conditions!!!
-% TODO start nonterminal Z on the stack
-% TODO start production Z -> S #, shift on # to accept
-% TODO add a goto to accept state after start nt reduction
+% Implemented:
+% * createLR and accept
+% * at least the sample grammar ex0 at line 83 is accepted (predicate run_ex0/0.)
+% 
+% Not implemented:
+% * no conflict reporting
+% * not tested on more grammars
+% 
+% Known shortcomings:
+% * solution uses assert and retract 
+
 
 :- dynamic shift_in/3, reduce_in/3, goto_in/3.
 :- dynamic regularized_gramar/2.
@@ -117,8 +119,11 @@ grammar(
     )
 ).
 
-run_tests :-
-    test(ex0, [[b,b, '#'], [a,b,b, '#'], [b,a,b, '#'], [a,b,a,b, '#'], [a,b,a,a,b, '#'], [a,a,b,a,a,b, '#'], ['#'], [a,a, '#']]).
+test_ex0 :-
+    test(ex0, [[b,b], [a,b,b], [b,a,b], [a,b,a,b], [a,b,a,a,b], [a,a,b,a,a,b], [], [a,a]]).
+
+test_ex1 :-
+    test(ex1, [[id], ['(',id,')'], [id,'+',ident], [id,'+',id]]).
 
 
 %%%%%%%%%%%%%%%%
@@ -328,8 +333,9 @@ retract_automaton :-
 accept(Automaton, Word) :-
     retract_automaton,
     assertall(Automaton),
+    append(Word, ['#'], WordWithEof),
     % automaton(Word, [nt('Z'), state(0)]),
-    automaton(Word, [state(0)]),
+    automaton(WordWithEof, [state(0)]),
     retract_automaton.
 
 automaton([], [state(accept)|_]) :- !.
@@ -358,27 +364,27 @@ stack_reduce([_,_|Stack], N, Nonterminal, NewStack) :-
 
 test_automaton :-
     example_automaton(A),
-    accept(A, [b,b,'#']).
+    accept(A, [b,b]).
 
 test_bad :-
     example_automaton(A),
-    \+ accept(A, [a,b,'#']).
+    \+ accept(A, [a,b]).
 
 test_example :-
     example_automaton(A),
 
-    accept(A, [b,b, '#']),
-    accept(A, [a,b,b, '#']),
-    accept(A, [b,a,b, '#']),
-    accept(A, [a,b,a,b, '#']),
-    accept(A, [a,b,a,a,b, '#']),
-    accept(A, [a,a,b,a,a,b, '#']),
+    accept(A, [b,b]),
+    accept(A, [a,b,b]),
+    accept(A, [b,a,b]),
+    accept(A, [a,b,a,b]),
+    accept(A, [a,b,a,a,b]),
+    accept(A, [a,a,b,a,a,b]),
 
-    \+ accept(A, ['#']),
-    \+ accept(A, [a,a, '#']),
-    \+ accept(A, [b, '#']),
-    % \+ accept(A, [a,b, '#']),
-    \+ accept(A, [b,b,a, '#']),
-    \+ accept(A, [b,a,b,a, '#']),
-    \+ accept(A, [b,b,b, '#']),
-    \+ accept(A, [a,b,a,b,a,b, '#']).
+    \+ accept(A, []),
+    \+ accept(A, [a,a]),
+    \+ accept(A, [b]),
+    \+ accept(A, [a,b]),
+    \+ accept(A, [b,b,a]),
+    \+ accept(A, [b,a,b,a]),
+    \+ accept(A, [b,b,b]),
+    \+ accept(A, [a,b,a,b,a,b]).
